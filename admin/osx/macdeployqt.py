@@ -314,8 +314,8 @@ def FixInstallPath(library_path, library, new_path):
 
 def FindSystemLibrary(library_path):
   for item in SYSTEM_LIBRARY_BLACKLIST:
-    print "FindSystemLibrary:", library_path, item
-    if library_path.startswith(item):
+    print "FindSystemLibrary:", item, os.path.realpath(library_path), "library_path", library_path, os.path.realpath(library_path), "startswith: ", os.path.realpath(library_path).startswith(os.path.realpath(item))
+    if os.path.realpath(library_path).startswith(os.path.realpath(item)):
           return None
 
   library_name = os.path.basename(library_path)
