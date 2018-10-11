@@ -314,8 +314,7 @@ def FixInstallPath(library_path, library, new_path):
 
 def FindSystemLibrary(library_path):
   for item in SYSTEM_LIBRARY_BLACKLIST:
-    if library_path.endswith('libssl.dylib'):
-      print "FindSystemLibrary:", library_path, item
+    print "FindSystemLibrary:", library_path, item
     if library_path.startswith(item):
           return None
 
