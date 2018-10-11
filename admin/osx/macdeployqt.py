@@ -207,7 +207,7 @@ def FixLibrary(path):
     print path, 'already fixed.'
     return
   elif FindSystemLibrary(path) is not None:
-    print path, ' is a system library'
+    print path, 'is a system library'
     return
   else:
     fixed_libraries.append(path)
@@ -314,7 +314,9 @@ def FixInstallPath(library_path, library, new_path):
 
 def FindSystemLibrary(library_path):
   for item in SYSTEM_LIBRARY_BLACKLIST:
-      if library_path.startswith(item):
+    if library_path.endswith('libssl.dylib'):
+      print "FindSystemLibrary:", library_path, item
+    if library_path.startswith(item):
           return None
 
   library_name = os.path.basename(library_path)
