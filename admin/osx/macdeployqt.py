@@ -117,7 +117,7 @@ def GetBrokenLibraries(binary):
       'frameworks': [],
       'libs': []}
   for line in [x.split(' ')[0].lstrip() for x in output.split('\n')[1:]]:
-    #print "Checking line: %s" % line
+    print "Checking line: %s" % line
     if not line:  # skip empty lines
       continue
     if os.path.basename(binary) == os.path.basename(line):
@@ -203,7 +203,11 @@ def FixFramework(path):
     FixLibraryInstallPath(library, new_path)
 
 def FixLibrary(path):
-  if path in fixed_libraries or FindSystemLibrary(path) is not None:
+  if path in fixed_libraries:
+    print path, 'already fixed.'
+    return
+  elif FindSystemLibrary(path) is not None:
+    print path, ' is a system library'
     return
   else:
     fixed_libraries.append(path)
@@ -326,6 +330,7 @@ def FixLibraryInstallPath(library_path, library):
     new_path = '@executable_path/../MacOS/%s' % os.path.basename(library_path)
     FixInstallPath(library_path, library, new_path)
   else:
+    print library_path, ' is a system library.'
     FixInstallPath(library_path, library, system_library)
 
 def FixFrameworkInstallPath(library_path, library):
