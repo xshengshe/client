@@ -93,9 +93,8 @@ void PropagateRemoteMove::start()
         + propagator()->account()->davPath() + propagator()->_remoteFolder + _item->_renameTarget);
     if (_item->_type == ItemTypeVirtualFile || _item->_type == ItemTypeVirtualFileDownload) {
         auto suffix = propagator()->syncOptions()._virtualFileSuffix;
-        ASSERT(source.endsWith(suffix) && destination.endsWith(suffix));
-        if (source.endsWith(suffix) && destination.endsWith(suffix)) {
-            source.chop(suffix.size());
+        ASSERT(!source.endsWith(suffix) && destination.endsWith(suffix));
+        if (destination.endsWith(suffix)) {
             destination.chop(suffix.size());
         }
     }

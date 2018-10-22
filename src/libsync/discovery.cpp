@@ -274,7 +274,8 @@ void ProcessDirectoryJob::processFile(PathTuple path,
                               << " | fileid: " << dbEntry._fileId << "//" << serverEntry.fileId
                               << " | inode: " << dbEntry._inode << "/" << localEntry.inode << "/";
 
-    if (_discoveryData->_renamedItems.contains(path._original)) {
+    if (_discoveryData->_renamedItemsLocal.contains(path._original)
+        || _discoveryData->_renamedItemsRemote.contains(path._original)) {
         qCDebug(lcDisco) << "Ignoring renamed";
         return; // Ignore this.
     }
@@ -447,7 +448,10 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
         }
 
         // Now we know there is a sane rename candidate.
-        QString originalPath = QString::fromUtf8(base._path);
+        PathTuple basePath;
+        basePath._original = QString::fromUtf8(base._path);
+        basePath._local = _discoveryData->adjustRenamedPathLocal(basePath._original);
+        basePath._server = _discoveryData->adjustRenamedPathRemote(basePath._original);
 
         // Rename of a virtual file
         if (base._type == ItemTypeVirtualFile && item->_type == ItemTypeFile) {
@@ -455,42 +459,45 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
             return;
         }
 
-        if (_discoveryData->_renamedItems.contains(originalPath)) {
+        if (_discoveryData->_renamedItemsRemote.contains(basePath._original)) {
             qCInfo(lcDisco, "folder already has a rename entry, skipping");
             return;
         }
 
         if (item->_type == ItemTypeFile) {
             csync_file_stat_t buf;
-            if (csync_vio_local_stat((_discoveryData->_localDir + originalPath).toUtf8(), &buf)) {
-                qCInfo(lcDisco) << "Local file does not exist anymore." << originalPath;
+            if (csync_vio_local_stat((_discoveryData->_localDir + basePath._local).toUtf8(), &buf)) {
+                qCInfo(lcDisco) << "Local file does not exist anymore." << basePath._local << basePath._original;
                 return;
             }
             if (buf.modtime != base._modtime || buf.size != base._fileSize || buf.type != ItemTypeFile) {
-                qCInfo(lcDisco) << "File has changed locally, not a rename." << originalPath;
+                qCInfo(lcDisco) << "File has changed locally, not a rename." << basePath._local << basePath._original;
                 return;
             }
         } else {
-            if (!QFileInfo(_discoveryData->_localDir + originalPath).isDir()) {
-                qCInfo(lcDisco) << "Local directory does not exist anymore." << originalPath;
+            if (!QFileInfo(_discoveryData->_localDir + basePath._local).isDir()) {
+                qCInfo(lcDisco) << "Local directory does not exist anymore." << basePath._local << basePath._original;
                 return;
             }
         }
 
-        bool wasDeletedOnServer = _discoveryData->findAndCancelDeletedJob(originalPath).first;
+        bool wasDeletedOnServer = _discoveryData->findAndCancelDeletedJob(basePath._original).first;
 
-        auto postProcessRename = [this, item, base, originalPath](PathTuple &path) {
-            auto adjustedOriginalPath = _discoveryData->adjustRenamedPath(originalPath);
-            _discoveryData->_renamedItems.insert(originalPath, path._target);
+        auto postProcessRename = [this, item, base, basePath](PathTuple &path) {
+            // The source of the rename must be aware of parent renames that
+            // propagated beforehand (if we rename A/ -> B/ and A/f -> B/f2 then
+            // we must propagate A/ -> B/ but B/f -> B/f2)
+            QString localSourceFile = _discoveryData->adjustRenamedPathRemote(basePath._local);
+            _discoveryData->_renamedItemsRemote.insert(basePath._original, path._server);
             item->_modtime = base._modtime;
             item->_inode = base._inode;
             item->_instruction = CSYNC_INSTRUCTION_RENAME;
             item->_direction = SyncFileItem::Down;
             item->_renameTarget = path._target;
-            item->_file = adjustedOriginalPath;
-            item->_originalFile = originalPath;
-            path._original = originalPath;
-            path._local = adjustedOriginalPath;
+            item->_file = localSourceFile;
+            item->_originalFile = basePath._original;
+            path._original = basePath._original;
+            path._local = basePath._local;
             qCInfo(lcDisco) << "Rename detected (down) " << item->_file << " -> " << item->_renameTarget;
         };
 
@@ -500,13 +507,13 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
         } else {
             // we need to make a request to the server to know that the original file is deleted on the server
             _pendingAsyncJobs++;
-            auto job = new RequestEtagJob(_discoveryData->_account, originalPath, this);
+            auto job = new RequestEtagJob(_discoveryData->_account, basePath._server, this);
             connect(job, &RequestEtagJob::finishedWithResult, this, [=](const Result<QString> &etag) mutable {
                 _pendingAsyncJobs--;
                 QTimer::singleShot(0, _discoveryData, &DiscoveryPhase::scheduleMoreJobs);
                 if (etag.errorCode() != 404 ||
                     // Somehow another item claimed this original path, consider as if it existed
-                    _discoveryData->_renamedItems.contains(originalPath)) {
+                    _discoveryData->_renamedItemsRemote.contains(basePath._original)) {
                     // If the file exist or if there is another error, consider it is a new file.
                     postProcessServerNew();
                     return;
@@ -515,7 +522,7 @@ void ProcessDirectoryJob::processFileAnalyzeRemoteInfo(
                 // The file do not exist, it is a rename
 
                 // In case the deleted item was discovered in parallel
-                _discoveryData->findAndCancelDeletedJob(originalPath);
+                _discoveryData->findAndCancelDeletedJob(basePath._original);
 
                 postProcessRename(path);
                 processFileFinalize(item, path, item->isDirectory(), item->_instruction == CSYNC_INSTRUCTION_RENAME ? NormalQuery : ParentDontExist, _queryServer);
@@ -751,29 +758,39 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
             isMove = item->_checksumHeader == base._checksumHeader;
         }
     }
-    auto originalPath = QString::fromUtf8(base._path);
-    if (isMove && _discoveryData->_renamedItems.contains(originalPath))
+
+    PathTuple basePath;
+    basePath._original = QString::fromUtf8(base._path);
+    basePath._local = _discoveryData->adjustRenamedPathLocal(basePath._original);
+    basePath._server = _discoveryData->adjustRenamedPathRemote(basePath._original);
+    if (base.isVirtualFile())
+        chopVirtualFileSuffix(basePath._server);
+
+    if (isMove && _discoveryData->_renamedItemsLocal.contains(basePath._original))
         isMove = false;
 
     //Check local permission if we are allowed to put move the file here
     // Technically we should use the one from the server, but we'll assume it is the same
-    if (isMove && !checkMovePermissions(base._remotePerm, originalPath, item->isDirectory()))
+    if (isMove && !checkMovePermissions(base._remotePerm, basePath._original, item->isDirectory()))
         isMove = false;
 
     // Finally make it a NEW or a RENAME
     if (!isMove) {
        postProcessLocalNew();
     } else {
-        auto wasDeletedOnClient = _discoveryData->findAndCancelDeletedJob(originalPath);
+        auto wasDeletedOnClient = _discoveryData->findAndCancelDeletedJob(basePath._original);
 
-        auto processRename = [item, originalPath, base, this](PathTuple &path) {
-            auto adjustedOriginalPath = _discoveryData->adjustRenamedPath(originalPath);
-            _discoveryData->_renamedItems.insert(originalPath, path._target);
+        auto processRename = [item, basePath, base, this](PathTuple &path) {
+            // The source of the rename must be aware of parent renames that
+            // propagated beforehand (if we rename A/ -> B/ and A/f -> B/f2 then
+            // we must propagate A/ -> B/ but B/f -> B/f2)
+            QString serverSourceFile = _discoveryData->adjustRenamedPathLocal(basePath._server);
+            _discoveryData->_renamedItemsLocal.insert(basePath._original, path._local);
             item->_renameTarget = path._target;
-            path._server = adjustedOriginalPath;
-            item->_file = path._server;
-            path._original = originalPath;
-            item->_originalFile = path._original;
+            path._server = basePath._server;
+            item->_file = serverSourceFile;
+            path._original = basePath._original;
+            item->_originalFile = basePath._original;
             item->_modtime = base._modtime;
             item->_inode = base._inode;
             item->_instruction = CSYNC_INSTRUCTION_RENAME;
@@ -790,18 +807,15 @@ void ProcessDirectoryJob::processFileAnalyzeLocalInfo(
         } else {
             // We must query the server to know if the etag has not changed
             _pendingAsyncJobs++;
-            QString serverOriginalPath = originalPath;
-            if (base.isVirtualFile())
-                chopVirtualFileSuffix(serverOriginalPath);
-            auto job = new RequestEtagJob(_discoveryData->_account, serverOriginalPath, this);
+            auto job = new RequestEtagJob(_discoveryData->_account, basePath._server, this);
             connect(job, &RequestEtagJob::finishedWithResult, this, [=](const Result<QString> &etag) mutable {
-                if (!etag || (*etag != base._etag && !item->isDirectory()) || _discoveryData->_renamedItems.contains(originalPath)) {
-                    qCInfo(lcDisco) << "Can't rename because the etag has changed or the directory is gone" << originalPath;
+                if (!etag || (*etag != base._etag && !item->isDirectory()) || _discoveryData->_renamedItemsLocal.contains(basePath._original)) {
+                    qCInfo(lcDisco) << "Can't rename because the etag has changed or the directory is gone" << basePath._original << basePath._server;
                     // Can't be a rename, leave it as a new.
                     postProcessLocalNew();
                 } else {
                     // In case the deleted item was discovered in parallel
-                    _discoveryData->findAndCancelDeletedJob(originalPath);
+                    _discoveryData->findAndCancelDeletedJob(basePath._original);
                     processRename(path);
                     recurseQueryServer = *etag == base._etag ? ParentNotChanged : NormalQuery;
                 }

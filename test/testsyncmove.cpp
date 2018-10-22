@@ -650,7 +650,12 @@ private slots:
         QCOMPARE(fakeFolder.currentLocalState(), expectedState);
         QCOMPARE(fakeFolder.currentRemoteState(), expectedState);
 
-        /* FIXME - likely addressed by ogoffart's sync code refactor
+        /* FIXME - doesn't work because of rename dependency/ordering issues
+         * Example buggy resolution:
+         *   Empty/A -> A (good)
+         *   AllEmpty -> A/AllEmpty (good)
+         *   AllEmpty/C -> C (oops, source doesn't exist!)
+         *
         // Now, the revert, but "crossed"
         fakeFolder.localModifier().rename("Empty/A", "A");
         fakeFolder.localModifier().rename("AllEmpty/C", "C");
@@ -661,6 +666,69 @@ private slots:
         QCOMPARE(fakeFolder.currentLocalState(), expectedState);
         QCOMPARE(fakeFolder.currentRemoteState(), expectedState);
         */
+    }
+
+    void testLocalAndRemoteRename1()
+    {
+        // Intentionally rename A2 -> A1 so the REMOVE isn't visible
+        // at the time the rename needs to be determined.
+        FakeFolder fakeFolder{ FileInfo() };
+        fakeFolder.remoteModifier().mkdir("A2");
+        fakeFolder.remoteModifier().mkdir("A2/Foo2");
+        fakeFolder.remoteModifier().insert("A2/Foo2/foofile");
+        fakeFolder.remoteModifier().mkdir("B2");
+        fakeFolder.remoteModifier().mkdir("B2/Foo2");
+        fakeFolder.remoteModifier().insert("B2/Foo2/foofile");
+        QVERIFY(fakeFolder.syncOnce());
+        QCOMPARE(fakeFolder.currentLocalState(), fakeFolder.currentRemoteState());
+
+        fakeFolder.remoteModifier().rename("A2", "A1");
+        fakeFolder.localModifier().rename("A2/Foo2", "A2/Foo1");
+
+        fakeFolder.localModifier().rename("B2", "B1");
+        fakeFolder.remoteModifier().rename("B2/Foo2", "B2/Foo1");
+
+        QSignalSpy completeSpy(&fakeFolder.syncEngine(), SIGNAL(itemCompleted(const SyncFileItemPtr &)));
+        QVERIFY(fakeFolder.syncOnce());
+        QCOMPARE(fakeFolder.currentLocalState(), fakeFolder.currentRemoteState());
+        QVERIFY(fakeFolder.currentLocalState().find("A1/Foo1/foofile"));
+        QVERIFY(!fakeFolder.currentLocalState().find("A1/Foo2/foofile"));
+        QVERIFY(!fakeFolder.currentLocalState().find("A2/Foo1/foofile"));
+        QVERIFY(!fakeFolder.currentLocalState().find("A2/Foo2/foofile"));
+        QVERIFY(fakeFolder.currentLocalState().find("B1/Foo1/foofile"));
+        QVERIFY(!fakeFolder.currentLocalState().find("B1/Foo2/foofile"));
+        QVERIFY(!fakeFolder.currentLocalState().find("B2/Foo1/foofile"));
+        QVERIFY(!fakeFolder.currentLocalState().find("B2/Foo2/foofile"));
+
+        QVERIFY(itemSuccessfulMove(completeSpy, "A1"));
+        QVERIFY(itemSuccessfulMove(completeSpy, "A1/Foo1"));
+        QVERIFY(itemSuccessfulMove(completeSpy, "B1"));
+        QVERIFY(itemSuccessfulMove(completeSpy, "B1/Foo1"));
+    }
+
+    void testLocalAndRemoteRename2()
+    {
+        FakeFolder fakeFolder{ FileInfo() };
+        fakeFolder.remoteModifier().mkdir("foo");
+        fakeFolder.remoteModifier().mkdir("foo/bar");
+        fakeFolder.remoteModifier().mkdir("foo/bar/baz");
+        fakeFolder.remoteModifier().insert("foo/bar/baz/file");
+        QVERIFY(fakeFolder.syncOnce());
+        QCOMPARE(fakeFolder.currentLocalState(), fakeFolder.currentRemoteState());
+
+        fakeFolder.remoteModifier().rename("foo", "foo2");
+        fakeFolder.remoteModifier().rename("foo2/bar/baz", "foo2/bar/baz2");
+        fakeFolder.localModifier().rename("foo/bar", "foo/bar2");
+
+        QSignalSpy completeSpy(&fakeFolder.syncEngine(), SIGNAL(itemCompleted(const SyncFileItemPtr &)));
+        QVERIFY(fakeFolder.syncOnce());
+        QCOMPARE(fakeFolder.currentLocalState(), fakeFolder.currentRemoteState());
+        QVERIFY(fakeFolder.currentLocalState().find("foo2/bar2/baz2/file"));
+
+        QVERIFY(itemSuccessfulMove(completeSpy, "foo2"));
+        QVERIFY(itemSuccessfulMove(completeSpy, "foo2/bar2"));
+        QVERIFY(itemSuccessfulMove(completeSpy, "foo2/bar2/baz2"));
+        QVERIFY(itemSuccessfulMove(completeSpy, "foo2/bar2/baz2/file"));
     }
 };
 

@@ -132,17 +132,26 @@ void DiscoveryPhase::checkSelectiveSyncNewFolder(const QString &path, RemotePerm
     propfindJob->start();
 }
 
-/* Given a path on the remote, give the path as it is when the rename is done */
-QString DiscoveryPhase::adjustRenamedPath(const QString &original) const
+static QString adjustRenamedPath(const QString &original, const QMap<QString, QString> &renames)
 {
     int slashPos = original.size();
     while ((slashPos = original.lastIndexOf('/', slashPos - 1)) > 0) {
-        auto it = _renamedItems.constFind(original.left(slashPos));
-        if (it != _renamedItems.constEnd()) {
+        auto it = renames.constFind(original.left(slashPos));
+        if (it != renames.constEnd()) {
             return *it + original.mid(slashPos);
         }
     }
     return original;
+}
+
+QString DiscoveryPhase::adjustRenamedPathLocal(const QString &original) const
+{
+    return adjustRenamedPath(original, _renamedItemsLocal);
+}
+
+QString DiscoveryPhase::adjustRenamedPathRemote(const QString &original) const
+{
+    return adjustRenamedPath(original, _renamedItemsRemote);
 }
 
 QPair<bool, QByteArray> DiscoveryPhase::findAndCancelDeletedJob(const QString &originalPath)

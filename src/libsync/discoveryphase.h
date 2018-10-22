@@ -133,7 +133,8 @@ class DiscoveryPhase : public QObject
     friend class ProcessDirectoryJob;
     QMap<QString, SyncFileItemPtr> _deletedItem;
     QMap<QString, ProcessDirectoryJob *> _queuedDeletedDirectories;
-    QMap<QString, QString> _renamedItems; // map source -> destinations
+    QMap<QString, QString> _renamedItemsRemote; // map source -> destinations
+    QMap<QString, QString> _renamedItemsLocal; // map source -> destinations
     int _currentlyActiveJobs = 0;
 
     void scheduleMoreJobs();
@@ -150,7 +151,8 @@ class DiscoveryPhase : public QObject
      * Note that it only considers parent directory renames. So if A/B got renamed to C/D,
      * checking A/B/file would yield C/D/file, but checking A/B would yield A/B.
      */
-    QString adjustRenamedPath(const QString &original) const;
+    QString adjustRenamedPathLocal(const QString &original) const;
+    QString adjustRenamedPathRemote(const QString &original) const;
 
     /**
      * Check if there is already a job to delete that item.
