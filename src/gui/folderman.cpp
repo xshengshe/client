@@ -1407,8 +1407,8 @@ QString FolderMan::findGoodPathForNewSyncFolder(const QString &basePath, const Q
     int attempt = 1;
     forever {
         const bool isGood =
-            !QFileInfo(folder).exists()
-            && FolderMan::instance()->checkPathValidityForNewFolder(folder, serverUrl).isEmpty();
+            //!QFileInfo(folder).exists() &&
+            FolderMan::instance()->checkPathValidityForNewFolder(folder, serverUrl).isEmpty();
         if (isGood) {
             break;
         }
