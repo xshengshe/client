@@ -93,6 +93,7 @@ generate_export_header("${csync_NAME}"
 target_link_libraries("${csync_NAME}"
   ${CSYNC_REQUIRED_LIBRARIES}
   ${SQLITE3_LIBRARIES}
+  ${OS_SPECIFIC_LINK_LIBRARIES}
   Qt5::Core Qt5::Concurrent
 )
 

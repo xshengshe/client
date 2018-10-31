@@ -18,6 +18,7 @@
 
 #include <CoreServices/CoreServices.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <ServiceManagement/SMLoginItem.h>
 
 namespace OCC {
 
@@ -43,6 +44,11 @@ static void setupFavLink_private(const QString &folder)
 
 bool hasLaunchOnStartup_private(const QString &)
 {
+
+    // FIXME: To find out if we were started from startup, check if the clientlauncher is running still.
+    return false;
+
+    // FIXME
     // this is quite some duplicate code with setLaunchOnStartup, at some point we should fix this FIXME.
     bool returnValue = false;
     QString filePath = QDir(QCoreApplication::applicationDirPath() + QLatin1String("/../..")).absolutePath();
@@ -76,8 +82,16 @@ bool hasLaunchOnStartup_private(const QString &)
 
 void setLaunchOnStartup_private(const QString &appName, const QString &guiName, bool enable)
 {
-    Q_UNUSED(appName)
-    Q_UNUSED(guiName)
+    Q_UNUSED(appName);
+    Q_UNUSED(guiName);
+
+    CFStringRef str = CFStringCreateWithCString(NULL,"com.owncloud.clienlauncher", kCFStringEncodingASCII);
+    bool b = SMLoginItemSetEnabled (str , enable);
+    qDebug() << "Startup is now" << b;
+    CFRelease(str);
+
+    return;
+    // FIXME
     QString filePath = QDir(QCoreApplication::applicationDirPath() + QLatin1String("/../..")).absolutePath();
     CFStringRef folderCFStr = CFStringCreateWithCString(0, filePath.toUtf8().data(), kCFStringEncodingUTF8);
     CFURLRef urlRef = CFURLCreateWithFileSystemPath(0, folderCFStr, kCFURLPOSIXPathStyle, true);

@@ -41,6 +41,13 @@ elseif(UNIX AND NOT APPLE)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now")
 endif()
 
+# FIXME For utility.cpp, should this be in guiutility.cpp
+if ( APPLE )
+    list(APPEND OS_SPECIFIC_LINK_LIBRARIES
+         /System/Library/Frameworks/ServiceManagement.framework
+    )
+endif()
+
 add_subdirectory(csync)
 add_subdirectory(libsync)
 if (NOT BUILD_LIBRARIES_ONLY)

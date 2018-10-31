@@ -19,5 +19,18 @@ add_dependencies(mac_overlayplugin ${APPLICATION_EXECUTABLE}) # for the ownCloud
 INSTALL(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Release/FinderSyncExt.appex
     DESTINATION ${OWNCLOUD_OSX_BUNDLE}/Contents/PlugIns
     USE_SOURCE_PERMISSIONS)
+
+
+add_custom_target( mac_clientlauncher ALL
+    xcodebuild -project ${CMAKE_SOURCE_DIR}/shell_integration/MacOSX/clienlauncher/clienlauncher.xcodeproj
+        -target clienlauncher -configuration Release "SYMROOT=${CMAKE_CURRENT_BINARY_DIR}"
+        "OC_APPLICATION_NAME=${APPLICATION_NAME}"
+        "OC_APPLICATION_REV_DOMAIN=${APPLICATION_REV_DOMAIN}"
+    COMMENT building Mac clientlauncher
+    VERBATIM)
+INSTALL(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Release/clienlauncher.app
+    DESTINATION ${OWNCLOUD_OSX_BUNDLE}/Contents/Library/LoginItems
+    USE_SOURCE_PERMISSIONS)
+
 endif(APPLE)
 
