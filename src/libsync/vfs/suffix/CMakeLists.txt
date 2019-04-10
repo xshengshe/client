@@ -24,7 +24,7 @@ if(APPLE)
     # For being lodable when client run from install dir (after make macdeployqt)
     set(vfs_installdir "${LIB_INSTALL_DIR}/../PlugIns")
 else()
-    set(vfs_installdir "${PLUGINDIR}")
+    set(vfs_installdir "${CMAKE_INSTALL_FULL_LIBDIR}/${APPLICATION_SHORTNAME}/plugins")
 endif()
 
 INSTALL(TARGETS "${synclib_NAME}_vfs_suffix"
