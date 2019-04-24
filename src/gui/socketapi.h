@@ -117,6 +117,7 @@ private:
     Q_INVOKABLE void command_MAKE_ONLINE_ONLY(const QString &filesArg, SocketListener *listener);
     Q_INVOKABLE void command_DELETE_ITEM(const QString &localFile, SocketListener *listener);
     Q_INVOKABLE void command_MOVE_ITEM(const QString &localFile, SocketListener *listener);
+    Q_INVOKABLE void command_ASYNC_ASSERT_ICON_IS_EQUAL(const QSharedPointer<SocketApiJob> &job);
 
     // Fetch the private link and call targetFun
     void fetchPrivateLinkUrlHelper(const QString &localFile, const std::function<void(const QString &url)> &targetFun);
