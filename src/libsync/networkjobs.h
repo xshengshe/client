@@ -19,6 +19,7 @@
 #include "abstractnetworkjob.h"
 #include "common/result.h"
 #include <QUrlQuery>
+#include <QXmlStreamReader>
 #include <functional>
 
 class QUrl;
@@ -63,13 +64,27 @@ class OWNCLOUDSYNC_EXPORT LsColXMLParser : public QObject
 public:
     explicit LsColXMLParser();
 
-    bool parse(const QByteArray &xml, QHash<QString, qint64> *sizes, const QString &expectedPath);
+    bool isInitialized();
+    bool initialize(const QString &expectedPath);
+    bool parseSome(const QByteArray &xmlSnippet);
+    QHash<QString, qint64> sizes;
 
 signals:
     void directoryListingSubfolders(const QStringList &items);
     void directoryListingIterated(const QString &name, const QMap<QString, QString> &properties);
     void finishedWithError(QNetworkReply *reply);
     void finishedWithoutError();
+protected:
+    QString _expectedPath;
+    QXmlStreamReader reader;
+    QStringList folders;
+    QString currentHref;
+    QMap<QString, QString> currentTmpProperties;
+    QMap<QString, QString> currentHttp200Properties;
+    bool currentPropsHaveHttp200;
+    bool insidePropstat;
+    bool insideProp;
+    bool insideMultiStatus;
 };
 
 class OWNCLOUDSYNC_EXPORT LsColJob : public AbstractNetworkJob
@@ -99,9 +114,13 @@ signals:
     void finishedWithoutError();
 
 private slots:
+    void newReplyHook(QNetworkReply *reply) override;
     virtual bool finished() Q_DECL_OVERRIDE;
+    void slotMetaDataChanged();
+    void slotReadyRead();
 
 private:
+    LsColXMLParser _parser;
     QList<QByteArray> _properties;
     QUrl _url; // Used instead of path() if the url is specified in the constructor
 };
