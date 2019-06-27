@@ -90,4 +90,4 @@ def strip(deps):
 print('=== Generating symbols for [%s] in [%s]' % (bundlePath, outPath))
 deps = findDeps()
 dumpSyms(deps)
-strip(deps)
+#strip(deps)
