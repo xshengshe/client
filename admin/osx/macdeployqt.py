@@ -377,8 +377,10 @@ def FindQtPlugin(name):
 
 
 def runCommand(command):
-  p = subprocess.Popen(command)
-  os.waitpid(p.pid, 0)
+  try:
+    subprocess.check_call(command)
+  except:
+    print("ERROR OCCURED")
 
 def runCommandDebug(command):
   print "Run command: %s" % command
