@@ -390,7 +390,7 @@ if 'ENABLE_CRASHREPORTS' in os.environ and os.environ['ENABLE_CRASHREPORTS'] == 
   print "Crashreports enabled. Dump symbols of our own binaries."
 
   # Create dsyms_dir so the first mv isn't a rename
-  runCommandDebug(['mkdir', dsyms_dir])
+  runCommandDebug(['mkdir', '-p', dsyms_dir])
 
   for binary in binaries:
     print("Create .dSYM for [binary]")
