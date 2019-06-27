@@ -65,10 +65,11 @@ def dumpSymsDSYMOptions(dep):
 
 def dumpSyms(deps):
     for dep in deps:
-        print("Generating symbols for [%s]" % dep)
-        with open('temp.sym', 'w') as temp:
+        logging.warning("Generating symbols for [%s]" % dep)
+        with open('temp.sym', 'w') as temp, open(os.devnull, 'w') as devnull:
             command = [dump_symsPath] + dumpSymsDSYMOptions(dep) + [dep]
-            subprocess.check_call(command, stdout=temp)
+            logging.warning("COMMAND: %s" % command)
+            subprocess.check_call(command, stdout=temp, stderr=devnull)
         with open('temp.sym', 'r') as temp:
             header = temp.readline()
             fields = header.split()
