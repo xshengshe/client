@@ -289,7 +289,7 @@ void Folder::setSyncPaused(bool paused)
     saveToSettings();
 
     if (!paused) {
-        setSyncState(SyncResult::NotYetStarted);
+        resetSyncResult();
     } else {
         setSyncState(SyncResult::Paused);
     }
@@ -308,7 +308,7 @@ SyncResult Folder::syncResult() const
     return _syncResult;
 }
 
-void Folder::prepareToSync()
+void Folder::resetSyncResult()
 {
     _syncResult.reset();
     _syncResult.setStatus(SyncResult::NotYetStarted);
